@@ -162,8 +162,8 @@ pub enum Commands {
         /// If true, any text in the edit field is obscured as in a password dialog: each character is displayed as a bullet.
         /// Default:
         ///   false: text in the edit field is shown in cleartext.
-        #[arg(long = "hidden", verbatim_doc_comment)]
-        hidden: bool,
+        #[arg(long = "hidden_answer", verbatim_doc_comment)]
+        hidden_answer: bool,
         /// A list of up to three button names.
         /// Default:
         ///   If you don’t specify any buttons, by default, Cancel and OK buttons are shown, with the OK button set as the default button.
@@ -259,7 +259,7 @@ impl Commands {
             Commands::Dialog {
                 text,
                 default_answer,
-                hidden,
+                hidden_answer,
                 buttons,
                 default_button,
                 cancel_button,
@@ -273,7 +273,7 @@ impl Commands {
                     "default answer",
                     default_answer.as_deref().map(Input::quoted),
                 );
-                c.arg(hidden.then_some("hidden answer"));
+                c.arg(hidden_answer.then_some("hidden answer"));
                 if !buttons.is_empty() {
                     c.pair("buttons", Some(Input::apple_script_list(buttons.clone())));
                 }
