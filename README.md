@@ -1,4 +1,4 @@
-# scprdisplay
+# scptdisplay
 
 Display a notification on macOS by
 
