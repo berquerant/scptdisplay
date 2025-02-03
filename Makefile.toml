@@ -1,0 +1,34 @@
+[tasks.test]
+command = "cargo"
+args = ["test", "--", "--nocapture"]
+
+[tasks.format]
+install_crate = "rustfmt"
+command = "cargo"
+args = ["fmt", "--all", "--", "--check"]
+
+[tasks.clippy]
+install_crate = "clippy"
+command = "cargo"
+args = ["clippy", "--", "-D", "warnings"]
+
+[tasks.lint]
+dependencies = [
+  "format",
+  "check",
+  "clippy",
+]
+
+[tasks.vuln]
+dependencies = [
+  "audit",
+  "outdated",
+]
+
+[tasks.ci]
+dependencies = [
+  "vuln",
+  "lint",
+  "test",
+  "build",
+]

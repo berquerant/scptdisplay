@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Run
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          set -e
+          rustup set profile minimal
+          rustup install stable
+          cargo install --force cargo-make
+      - name: vuln
+        run: cargo make vuln
+      - name: lint
+        run: cargo make lint
+      - name: test
+        run: cargo make test
+      - name: build
+        run: cargo make build
