@@ -308,9 +308,9 @@ impl Commands {
                     Ok(Data::Dialog {
                         raw: x,
                         record: r,
-                        text: text,
-                        button: button,
-                        gave_up: gave_up,
+                        text,
+                        button,
+                        gave_up,
                     })
                 }
             },
@@ -326,8 +326,8 @@ impl Commands {
                     Ok(Data::Alert {
                         raw: x,
                         record: r,
-                        button: button,
-                        gave_up: gave_up,
+                        button,
+                        gave_up,
                     })
                 }
             },

@@ -16,7 +16,7 @@ impl Response {
     pub fn from_err_with_code(from: Error, code: Option<i32>) -> Self {
         Response {
             result: Code::Err,
-            code: code,
+            code,
             error: Some(format!("{}", from)),
             data: None,
         }
