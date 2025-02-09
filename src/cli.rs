@@ -34,7 +34,7 @@ pub enum Commands {
     ///     code(int or null): exit status of invoked process.
     ///     error(string or null): stderr of invoked process or null if result is ok.
     ///     data(map or null): null if result is error.
-    ///       notificarion(empty map): empty map.
+    ///       notification(empty map): empty map.
     ///
     /// Exit status
     ///   0 successfully processed.
