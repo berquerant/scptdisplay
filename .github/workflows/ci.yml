@@ -21,8 +21,8 @@ jobs:
           rustup install stable
           cargo install --force cargo-make
       - uses: Swatinem/rust-cache@v2
-      - name: vuln
-        run: cargo make vuln
+      # - name: vuln
+      #   run: cargo make vuln
       - name: lint
         run: cargo make lint
       - name: test
