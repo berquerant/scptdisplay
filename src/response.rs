@@ -17,7 +17,7 @@ impl Response {
         Response {
             result: Code::Err,
             code,
-            error: Some(format!("{}", from)),
+            error: Some(format!("{from}")),
             data: None,
         }
     }
@@ -28,7 +28,7 @@ impl From<Error> for Response {
         Response {
             result: Code::Err,
             code: None,
-            error: Some(format!("{}", from)),
+            error: Some(format!("{from}")),
             data: None,
         }
     }
@@ -68,7 +68,7 @@ impl fmt::Display for Code {
             Code::Ok => "ok",
             Code::Err => "error",
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 

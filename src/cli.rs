@@ -253,7 +253,7 @@ impl Commands {
                     "cancel button",
                     cancel_button.as_deref().map(Input::integer_or_text),
                 );
-                c.pair("giving up after", giving_up_after.map(|x| format!("{}", x)));
+                c.pair("giving up after", giving_up_after.map(|x| format!("{x}")));
                 c
             }
             Commands::Dialog {
@@ -287,7 +287,7 @@ impl Commands {
                 );
                 c.pair("with title", title.as_deref().map(Input::quoted));
                 c.pair("with icon", icon.as_deref().map(Input::integer_or_text));
-                c.pair("giving up after", giving_up_after.map(|x| format!("{}", x)));
+                c.pair("giving up after", giving_up_after.map(|x| format!("{x}")));
                 c
             }
         }

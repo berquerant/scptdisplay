@@ -28,7 +28,7 @@ impl From<Cmd> for String {
     fn from(from: Cmd) -> Self {
         from.0
             .into_iter()
-            .reduce(|acc, x| format!("{} {}", acc, x))
+            .reduce(|acc, x| format!("{acc} {x}"))
             .unwrap()
     }
 }

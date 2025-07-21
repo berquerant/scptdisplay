@@ -16,8 +16,8 @@ fn main() {
     let args = Cli::parse();
     let cli_cmd = args.cmd();
 
-    debug!("args: {:?}", args);
-    debug!("cmd: {:?}", cli_cmd);
+    debug!("args: {args:?}");
+    debug!("cmd: {cli_cmd:?}");
 
     let cmd = process::Command::from(cli_cmd)
         .stdin(process::Stdio::null())

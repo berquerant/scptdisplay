@@ -5,7 +5,7 @@ pub struct Input;
 
 impl Input {
     pub fn quoted(x: &str) -> String {
-        format!("\"{}\"", x)
+        format!("\"{x}\"")
     }
 
     pub fn integer_or_text(x: &str) -> String {
@@ -26,9 +26,9 @@ impl Input {
                     let s = x.into();
                     Input::quoted(&s)
                 })
-                .reduce(|acc, x| format!("{},{}", acc, x))
+                .reduce(|acc, x| format!("{acc},{x}"))
                 .unwrap();
-            format!("{{{}}}", x)
+            format!("{{{x}}}")
         }
     }
 }
