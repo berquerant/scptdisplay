@@ -21,6 +21,10 @@ impl Response {
             data: None,
         }
     }
+
+    pub fn is_err(&self) -> bool {
+        matches!(self.result, Code::Err)
+    }
 }
 
 impl From<Error> for Response {
@@ -91,4 +95,21 @@ pub enum Data {
         button: Option<String>,
         gave_up: bool,
     },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_response_is_err() {
+        let ok_resp = Response::from(Data::Notification {});
+        assert!(!ok_resp.is_err());
+
+        let err_resp = Response::from_err_with_code(anyhow::anyhow!("error"), Some(1));
+        assert!(err_resp.is_err());
+
+        let err_from = Response::from(anyhow::anyhow!("error 2"));
+        assert!(err_from.is_err());
+    }
 }

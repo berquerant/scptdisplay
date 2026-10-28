@@ -46,4 +46,7 @@ fn main() {
     };
 
     println!("{}", serde_json::to_string(&result).unwrap());
+    if result.is_err() {
+        process::exit(1);
+    }
 }
