@@ -18,19 +18,15 @@ impl Input {
     }
 
     pub fn apple_script_list<S: Into<String>>(v: Vec<S>) -> String {
-        if v.is_empty() {
-            "{}".into()
-        } else {
-            let x = v
-                .into_iter()
-                .map(|x| {
-                    let s = x.into();
-                    Input::quoted(&s)
-                })
-                .reduce(|acc, x| format!("{acc},{x}"))
-                .unwrap();
-            format!("{{{x}}}")
-        }
+        let x = v
+            .into_iter()
+            .map(|x| {
+                let s = x.into();
+                Input::quoted(&s)
+            })
+            .collect::<Vec<_>>()
+            .join(",");
+        format!("{{{x}}}")
     }
 }
 

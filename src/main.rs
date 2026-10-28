@@ -7,7 +7,6 @@ use crate::response::Response;
 use anyhow::{anyhow, Error};
 use clap::Parser;
 use log::debug;
-use std::env;
 use std::process;
 
 fn main() {
@@ -23,8 +22,6 @@ fn main() {
         .stdin(process::Stdio::null())
         .stdout(process::Stdio::piped())
         .stderr(process::Stdio::piped())
-        .env_clear()
-        .envs(env::vars())
         .spawn();
 
     let result: Response = match cmd {

@@ -26,19 +26,16 @@ impl Cmd {
 
 impl From<Cmd> for String {
     fn from(from: Cmd) -> Self {
-        from.0
-            .into_iter()
-            .reduce(|acc, x| format!("{acc} {x}"))
-            .unwrap()
+        from.0.join(" ")
     }
 }
 
 impl From<Cmd> for Command {
     fn from(from: Cmd) -> Self {
-        let v = from.0;
-        let program = &v[0];
+        let mut v = from.0.into_iter();
+        let program = v.next().unwrap_or_default();
         let mut c = Command::new(program);
-        for x in v.iter().skip(1) {
+        for x in v {
             c.arg(x);
         }
         c
@@ -72,5 +69,12 @@ mod tests {
         got.arg::<String>(None);
         let want = vec!["p", "1"];
         assert_eq!(want, got.0);
+    }
+
+    #[test]
+    fn test_cmd_empty() {
+        let got = Cmd(vec![]);
+        assert_eq!(String::from(got.clone()), "");
+        let _ = Command::from(got);
     }
 }
