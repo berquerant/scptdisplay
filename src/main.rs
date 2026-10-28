@@ -14,7 +14,7 @@ async fn main() {
 
     match &args.command {
         Commands::Mcp => {
-            if let Err(e) = mcp::run_mcp_server().await {
+            if let Err(e) = mcp::run_mcp_server_with_osascript(&args.osascript).await {
                 eprintln!("MCP server error: {e}");
                 process::exit(1);
             }

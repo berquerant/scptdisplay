@@ -224,9 +224,15 @@ impl ScptdisplayMcpServer {
 }
 
 pub async fn run_mcp_server() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    run_mcp_server_with_osascript("osascript").await
+}
+
+pub async fn run_mcp_server_with_osascript(
+    osascript: impl Into<String>,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     use rmcp::serve_server;
     use rmcp::transport::io::stdio;
-    let server = ScptdisplayMcpServer::new();
+    let server = ScptdisplayMcpServer::with_osascript(osascript);
     let service = serve_server(server, stdio()).await?;
     service.waiting().await?;
     Ok(())
