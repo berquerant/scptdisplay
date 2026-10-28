@@ -65,11 +65,20 @@ pub enum Commands {
     Notification {
         /// The body text of the notification.
         /// At least one of this and the title must be specified.
-        #[arg(value_name = "TEXT", num_args = 1, value_parser = clap::value_parser!(String), verbatim_doc_comment)]
-        text: String,
+        #[arg(
+            value_name = "TEXT",
+            required_unless_present = "title",
+            verbatim_doc_comment
+        )]
+        text: Option<String>,
         /// The title of the notification.
         /// At least one of this and the body text must be specified.
-        #[arg(short = 't', long = "title", verbatim_doc_comment)]
+        #[arg(
+            short = 't',
+            long = "title",
+            required_unless_present = "text",
+            verbatim_doc_comment
+        )]
         title: Option<String>,
         /// The subtitle of the notification.
         #[arg(short = 's', long = "subtitle", verbatim_doc_comment)]
@@ -244,7 +253,8 @@ impl Commands {
                 sound_name,
             } => {
                 let mut c = Cmd::new("display notification");
-                c.arg(Some(Input::quoted(text)));
+                let body = text.as_deref().unwrap_or("");
+                c.arg(Some(Input::quoted(body)));
                 c.pair("with title", title.as_deref().map(Input::quoted));
                 c.pair("subtitle", subtitle.as_deref().map(Input::quoted));
                 c.pair("sound name", sound_name.as_deref().map(Input::quoted));
