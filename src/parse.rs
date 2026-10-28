@@ -41,12 +41,43 @@ pub type StringMap = HashMap<String, String>;
 
 impl Output {
     pub fn record(x: &str) -> StringMap {
+        const KNOWN_KEYS: &[&str] = &["button returned", "text returned", "gave up"];
+
         let xs: Vec<_> = x.trim_end().split(',').collect();
         let mut m = StringMap::new();
-        for x in xs {
-            if let Some((k, v)) = x.split_once(':') {
-                let k = k.trim_start();
-                m.insert(k.to_string(), v.to_string());
+        let mut current_key: Option<String> = None;
+
+        let has_known_keys = xs.iter().any(|part| {
+            part.split_once(':')
+                .map(|(k, _)| KNOWN_KEYS.contains(&k.trim_start()))
+                .unwrap_or(false)
+        });
+
+        for part in xs {
+            if let Some((k, v)) = part.split_once(':') {
+                let trimmed_k = k.trim_start();
+                if has_known_keys {
+                    if KNOWN_KEYS.contains(&trimmed_k) {
+                        current_key = Some(trimmed_k.to_string());
+                        m.insert(trimmed_k.to_string(), v.to_string());
+                    } else if let Some(ref prev_k) = current_key {
+                        if let Some(val) = m.get_mut(prev_k) {
+                            val.push(',');
+                            val.push_str(part);
+                        }
+                    } else {
+                        current_key = Some(trimmed_k.to_string());
+                        m.insert(trimmed_k.to_string(), v.to_string());
+                    }
+                } else {
+                    current_key = Some(trimmed_k.to_string());
+                    m.insert(trimmed_k.to_string(), v.to_string());
+                }
+            } else if let Some(ref prev_k) = current_key {
+                if let Some(val) = m.get_mut(prev_k) {
+                    val.push(',');
+                    val.push_str(part);
+                }
             }
         }
         m
@@ -79,6 +110,27 @@ mod tests {
         StringMap::from([
             ("key".to_string(), "value".to_string()),
             ("key 2".to_string(), "value 2".to_string()),
+        ])
+    );
+    test_output_record!(
+        test_record_dialog_with_commas,
+        "button returned:OK, text returned:hello, world, gave up:false",
+        StringMap::from([
+            ("button returned".to_string(), "OK".to_string()),
+            ("text returned".to_string(), "hello, world".to_string()),
+            ("gave up".to_string(), "false".to_string()),
+        ])
+    );
+    test_output_record!(
+        test_record_dialog_with_colons_and_commas,
+        "button returned:OK, text returned:Note: first, second: item, gave up:false",
+        StringMap::from([
+            ("button returned".to_string(), "OK".to_string()),
+            (
+                "text returned".to_string(),
+                "Note: first, second: item".to_string()
+            ),
+            ("gave up".to_string(), "false".to_string()),
         ])
     );
 
