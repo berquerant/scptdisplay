@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::convert::From;
 use std::fmt;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct Response {
     result: Code,
     code: Option<i32>,
@@ -58,7 +58,7 @@ impl From<Result<Data>> for Response {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub enum Code {
     #[serde(rename(serialize = "ok"))]
     Ok,
@@ -76,7 +76,7 @@ impl fmt::Display for Code {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub enum Data {
     #[serde(rename(serialize = "notification"))]
     Notification {},

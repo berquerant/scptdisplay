@@ -365,3 +365,209 @@ impl Commands {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    #[test]
+    fn test_notification_cmd_full() {
+        let cmd = Commands::Notification {
+            text: Some("body".to_string()),
+            title: Some("title".to_string()),
+            subtitle: Some("subtitle".to_string()),
+            sound_name: Some("Ping".to_string()),
+        };
+        let c = cmd.cmd();
+        assert_eq!(
+            String::from(c),
+            "display notification \"body\" with title \"title\" subtitle \"subtitle\" sound name \"Ping\""
+        );
+    }
+
+    #[test]
+    fn test_notification_cmd_title_only() {
+        let cmd = Commands::Notification {
+            text: None,
+            title: Some("title".to_string()),
+            subtitle: None,
+            sound_name: None,
+        };
+        let c = cmd.cmd();
+        assert_eq!(
+            String::from(c),
+            "display notification \"\" with title \"title\""
+        );
+    }
+
+    #[test]
+    fn test_alert_cmd_full() {
+        let cmd = Commands::Alert {
+            text: "alert text".to_string(),
+            message: Some("alert message".to_string()),
+            alert_type: AlertType::Warning,
+            buttons: vec!["Cancel".to_string(), "OK".to_string()],
+            default_button: Some("2".to_string()),
+            cancel_button: Some("1".to_string()),
+            giving_up_after: Some(10),
+        };
+        let c = cmd.cmd();
+        assert_eq!(
+            String::from(c),
+            "display alert \"alert text\" message \"alert message\" as warning buttons {\"Cancel\",\"OK\"} default button 2 cancel button 1 giving up after 10"
+        );
+    }
+
+    #[test]
+    fn test_dialog_cmd_full() {
+        let cmd = Commands::Dialog {
+            text: "enter name".to_string(),
+            default_answer: Some("alice".to_string()),
+            hidden_answer: true,
+            buttons: vec!["OK".to_string()],
+            default_button: Some("1".to_string()),
+            cancel_button: None,
+            title: Some("Login".to_string()),
+            icon: Some("note".to_string()),
+            giving_up_after: Some(30),
+        };
+        let c = cmd.cmd();
+        assert_eq!(
+            String::from(c),
+            "display dialog \"enter name\" default answer \"alice\" hidden answer buttons {\"OK\"} default button 1 with title \"Login\" with icon \"note\" giving up after 30"
+        );
+    }
+
+    #[test]
+    fn test_cli_cmd_wrapper() {
+        let cli = Cli {
+            osascript: "osascript".to_string(),
+            command: Commands::Notification {
+                text: Some("hi".to_string()),
+                title: None,
+                subtitle: None,
+                sound_name: None,
+            },
+        };
+        let c = cli.cmd();
+        assert_eq!(String::from(c), "osascript -e display notification \"hi\"");
+    }
+
+    #[test]
+    fn test_parse_stdout_notification() {
+        let cmd = Commands::Notification {
+            text: Some("hi".to_string()),
+            title: None,
+            subtitle: None,
+            sound_name: None,
+        };
+        assert_eq!(
+            cmd.parse_stdout(b"".to_vec()).unwrap(),
+            Data::Notification {}
+        );
+    }
+
+    #[test]
+    fn test_parse_stdout_alert() {
+        let cmd = Commands::Alert {
+            text: "hi".to_string(),
+            message: None,
+            alert_type: AlertType::Informational,
+            buttons: vec![],
+            default_button: None,
+            cancel_button: None,
+            giving_up_after: None,
+        };
+        let raw = b"button returned:OK, gave up:false".to_vec();
+        let data = cmd.parse_stdout(raw).unwrap();
+        assert_eq!(
+            data,
+            Data::Alert {
+                raw: "button returned:OK, gave up:false".to_string(),
+                record: HashMap::from([
+                    ("button returned".to_string(), "OK".to_string()),
+                    ("gave up".to_string(), "false".to_string()),
+                ]),
+                button: Some("OK".to_string()),
+                gave_up: false,
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_stdout_dialog() {
+        let cmd = Commands::Dialog {
+            text: "hi".to_string(),
+            default_answer: None,
+            hidden_answer: false,
+            buttons: vec![],
+            default_button: None,
+            cancel_button: None,
+            title: None,
+            icon: None,
+            giving_up_after: None,
+        };
+        let raw = b"button returned:OK, text returned:hello, world, gave up:false".to_vec();
+        let data = cmd.parse_stdout(raw).unwrap();
+        assert_eq!(
+            data,
+            Data::Dialog {
+                raw: "button returned:OK, text returned:hello, world, gave up:false".to_string(),
+                record: HashMap::from([
+                    ("button returned".to_string(), "OK".to_string()),
+                    ("text returned".to_string(), "hello, world".to_string()),
+                    ("gave up".to_string(), "false".to_string()),
+                ]),
+                text: Some("hello, world".to_string()),
+                button: Some("OK".to_string()),
+                gave_up: false,
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_stdout_dialog_gave_up() {
+        let cmd = Commands::Dialog {
+            text: "hi".to_string(),
+            default_answer: None,
+            hidden_answer: false,
+            buttons: vec![],
+            default_button: None,
+            cancel_button: None,
+            title: None,
+            icon: None,
+            giving_up_after: None,
+        };
+        let raw = b"button returned:, text returned:, gave up:true".to_vec();
+        let data = cmd.parse_stdout(raw).unwrap();
+        assert_eq!(
+            data,
+            Data::Dialog {
+                raw: "button returned:, text returned:, gave up:true".to_string(),
+                record: HashMap::from([
+                    ("button returned".to_string(), "".to_string()),
+                    ("text returned".to_string(), "".to_string()),
+                    ("gave up".to_string(), "true".to_string()),
+                ]),
+                text: Some("".to_string()),
+                button: Some("".to_string()),
+                gave_up: true,
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_stdout_invalid_utf8() {
+        let cmd = Commands::Alert {
+            text: "hi".to_string(),
+            message: None,
+            alert_type: AlertType::Informational,
+            buttons: vec![],
+            default_button: None,
+            cancel_button: None,
+            giving_up_after: None,
+        };
+        assert!(cmd.parse_stdout(vec![0xff, 0xfe]).is_err());
+    }
+}
