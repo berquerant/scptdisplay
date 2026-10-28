@@ -5,7 +5,8 @@ pub struct Input;
 
 impl Input {
     pub fn quoted(x: &str) -> String {
-        format!("\"{x}\"")
+        let escaped = x.replace('\\', "\\\\").replace('"', "\\\"");
+        format!("\"{escaped}\"")
     }
 
     pub fn integer_or_text(x: &str) -> String {
@@ -79,6 +80,25 @@ mod tests {
             ("key".to_string(), "value".to_string()),
             ("key 2".to_string(), "value 2".to_string()),
         ])
+    );
+
+    macro_rules! test_input_quoted {
+        ($name:ident, $input:expr, $want:expr) => {
+            #[test]
+            fn $name() {
+                let got = Input::quoted($input);
+                assert_eq!($want, got);
+            }
+        };
+    }
+
+    test_input_quoted!(test_quoted_plain, "hello", "\"hello\"");
+    test_input_quoted!(test_quoted_quotes, "foo\"bar", "\"foo\\\"bar\"");
+    test_input_quoted!(test_quoted_backslash, "foo\\bar", "\"foo\\\\bar\"");
+    test_input_quoted!(
+        test_quoted_injection_attempt,
+        "foo\" & (do shell script \"pwned\") & \"",
+        "\"foo\\\" & (do shell script \\\"pwned\\\") & \\\"\""
     );
 
     macro_rules! test_input_integer_or_text {

@@ -2,7 +2,27 @@ use crate::cmd::Cmd;
 use crate::parse::{Input, Output};
 use crate::response::Data;
 use anyhow::{Error, Result};
-use clap::{self, Parser, Subcommand};
+use clap::{self, Parser, Subcommand, ValueEnum};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum AlertType {
+    #[value(name = "informational")]
+    Informational,
+    #[value(name = "warning")]
+    Warning,
+    #[value(name = "critical")]
+    Critical,
+}
+
+impl AlertType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Informational => "informational",
+            Self::Warning => "warning",
+            Self::Critical => "critical",
+        }
+    }
+}
 
 /// Display a notification, dialog or alert via AppleScript.
 ///
@@ -97,9 +117,10 @@ pub enum Commands {
             short = 't',
             long = "as",
             default_value = "informational",
+            value_enum,
             verbatim_doc_comment
         )]
-        alert_type: Option<String>,
+        alert_type: AlertType,
         /// A list of up to three button names.
         /// If you supply one name, a button with that name serves as the default and is displayed on the right side of the alert dialog.
         /// If you supply two names, two buttons are displayed on the right, with the second serving as the default button.
@@ -241,7 +262,7 @@ impl Commands {
                 let mut c = Cmd::new("display alert");
                 c.arg(Some(Input::quoted(text)));
                 c.pair("message", message.as_deref().map(Input::quoted));
-                c.pair("as", alert_type.as_deref());
+                c.pair("as", Some(alert_type.as_str()));
                 if !buttons.is_empty() {
                     c.pair("buttons", Some(Input::apple_script_list(buttons.clone())));
                 }
