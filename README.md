@@ -22,6 +22,7 @@ Commands:
   notification  Posts a notification using the Notification Center, containing a title, subtitle, and explanation, and optionally playing a sound. [aliases: n, notify]
   alert         Displays a standardized alert containing a message, explanation, and from one to three buttons. [aliases: a]
   dialog        Displays a dialog containing a message, one to three buttons, and optionally an icon and a ﬁeld in which the user can enter text. [aliases: d]
+  mcp           Start Model Context Protocol (MCP) server over stdio
   help          Print this message or the help of the given subcommand(s)
 
 Options:
@@ -75,6 +76,37 @@ scptdisplay dialog "Enter token:" --default_answer "" --hidden_answer --title "A
 
 # Auto-dismiss after 10 seconds
 scptdisplay dialog "Are you still there?" --buttons "No" "Yes" --default_button 2 --giving_up_after 10
+```
+
+### 4. Model Context Protocol (MCP) Server
+
+Run `scptdisplay` as a Model Context Protocol (MCP) server over stdio:
+
+```shell
+scptdisplay mcp
+```
+
+#### MCP Tools Provided:
+- `notification`: Posts a macOS desktop notification banner using Notification Center.
+  - Parameters: `text` (string), `title` (string), `subtitle` (string), `sound_name` (string).
+- `alert`: Displays a standardized alert dialog with 1 to 3 buttons.
+  - Parameters: `text` (string, required), `message` (string), `alert_type` ("informational" | "warning" | "critical"), `buttons` (array of strings), `default_button` (string), `cancel_button` (string), `giving_up_after` (integer).
+- `dialog`: Displays an interactive dialog with buttons and optional text field.
+  - Parameters: `text` (string, required), `default_answer` (string), `hidden_answer` (boolean), `buttons` (array of strings), `default_button` (string), `cancel_button` (string), `title` (string), `icon` (string), `giving_up_after` (integer).
+
+#### Claude Desktop / MCP Configuration Example
+
+Add `scptdisplay` to your `claude_desktop_config.json` or MCP settings:
+
+```json
+{
+  "mcpServers": {
+    "scptdisplay": {
+      "command": "scptdisplay",
+      "args": ["mcp"]
+    }
+  }
+}
 ```
 
 ---

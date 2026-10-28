@@ -3,14 +3,19 @@ use crate::parse::{Input, Output};
 use crate::response::Data;
 use anyhow::{Error, Result};
 use clap::{self, Parser, Subcommand, ValueEnum};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Serialize, Deserialize, JsonSchema)]
 pub enum AlertType {
     #[value(name = "informational")]
+    #[serde(rename = "informational")]
     Informational,
     #[value(name = "warning")]
+    #[serde(rename = "warning")]
     Warning,
     #[value(name = "critical")]
+    #[serde(rename = "critical")]
     Critical,
 }
 
@@ -39,9 +44,9 @@ impl AlertType {
 pub struct Cli {
     /// osascript command.
     #[arg(long = "osascript", default_value = "osascript")]
-    osascript: String,
+    pub osascript: String,
     #[command(subcommand)]
-    command: Commands,
+    pub command: Commands,
 }
 
 #[derive(Debug, Subcommand)]
@@ -229,6 +234,9 @@ pub enum Commands {
         #[arg(short = 'g', long = "giving_up_after", verbatim_doc_comment)]
         giving_up_after: Option<u8>,
     },
+    /// Start Model Context Protocol (MCP) server over stdio.
+    #[command(about)]
+    Mcp,
 }
 
 impl Cli {
@@ -321,10 +329,12 @@ impl Commands {
                 c.pair("giving up after", giving_up_after.map(|x| format!("{x}")));
                 c
             }
+            Commands::Mcp => Cmd::new("osascript"),
         }
     }
-    fn parse_stdout(&self, output: Vec<u8>) -> Result<Data> {
+    pub fn parse_stdout(&self, output: Vec<u8>) -> Result<Data> {
         match self {
+            Commands::Mcp => Ok(Data::Notification {}),
             Commands::Notification { .. } => Ok(Data::Notification {}),
             Commands::Dialog { .. } => match String::from_utf8(output) {
                 Err(err) => Err(Error::new(err)),
@@ -362,6 +372,29 @@ impl Commands {
                     })
                 }
             },
+        }
+    }
+
+    pub fn execute(&self, osascript: &str) -> Result<Data> {
+        if matches!(self, Commands::Mcp) {
+            anyhow::bail!("Cannot execute osascript for Mcp command");
+        }
+        let mut c = Cmd::new(osascript);
+        let a = self.cmd();
+        c.pair("-e", Some(&String::from(a)));
+
+        let child = std::process::Command::from(c)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()?;
+
+        let output = child.wait_with_output()?;
+        if output.status.success() {
+            self.parse_stdout(output.stdout)
+        } else {
+            let msg = String::from_utf8(output.stderr).unwrap_or_else(|e| e.to_string());
+            anyhow::bail!("{msg}")
         }
     }
 }

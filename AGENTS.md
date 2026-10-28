@@ -30,6 +30,7 @@ When making structural changes to the project (adding or modifying CLI subcomman
 | `notification` (`n`, `notify`) | `display notification` | macOS Notification Center banner | `text` (optional if title provided), `-t, --title`, `-s, --subtitle`, `--sound` |
 | `alert` (`a`) | `display alert` | Standardized alert dialog with 1–3 buttons | `text`, `--message`, `-t, --as` (`AlertType`), `--buttons`, `--default_button`, `--cancel_button`, `-g, --giving_up_after` |
 | `dialog` (`d`) | `display dialog` | Interactive dialog with text field and 1–3 buttons | `text`, `--default_answer`, `--hidden_answer`, `--buttons`, `--default_button`, `--cancel_button`, `-t, --title`, `--icon`, `-g, --giving_up_after` |
+| `mcp` | — | Model Context Protocol (MCP) server over stdio | — |
 
 ### CLI Options
 - `--osascript <OSASCRIPT>`: Path or name of the osascript binary (defaults to `osascript`). Can be pointed to a mock or wrapper script for automated testing.
@@ -45,9 +46,11 @@ scptdisplay/
 │   └── workflows/
 │       └── ci.yml           # GitHub Actions CI workflow (lint, test, build)
 ├── src/
+│   ├── lib.rs               # Library root re-exporting modules for internal and external use
 │   ├── main.rs              # Application entry point: logging, argument parsing, child process execution, exit status handling
 │   ├── cli.rs               # Clap CLI definition (`Cli`, `Commands`, `AlertType`), AppleScript command synthesis, and response parsing
 │   ├── cmd.rs               # `Cmd` abstraction managing process command vectors and argument construction
+│   ├── mcp.rs               # Model Context Protocol (MCP) stdio server implementation using `rmcp`
 │   ├── parse.rs             # AppleScript input escaping (`Input`) and record output parsing (`Output`)
 │   └── response.rs          # Unified JSON `Response`, status `Code`, and subcommand `Data` models
 ├── Cargo.lock               # Cargo dependency lockfile
