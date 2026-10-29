@@ -1,6 +1,6 @@
 use crate::cmd::Cmd;
 use crate::parse::{Input, Output};
-use crate::response::Data;
+use crate::response::{Data, Response};
 use anyhow::{Error, Result};
 use clap::{self, Parser, Subcommand, ValueEnum};
 use schemars::JsonSchema;
@@ -249,6 +249,9 @@ impl Cli {
     pub fn parse_stdout(&self, output: Vec<u8>) -> Result<Data> {
         self.command.parse_stdout(output)
     }
+    pub fn execute(&self) -> Response {
+        self.command.execute_response(&self.osascript)
+    }
 }
 
 impl Commands {
@@ -325,7 +328,7 @@ impl Commands {
                     cancel_button.as_deref().map(Input::integer_or_text),
                 );
                 c.pair("with title", title.as_deref().map(Input::quoted));
-                c.pair("with icon", icon.as_deref().map(Input::integer_or_text));
+                c.pair("with icon", icon.as_deref().map(Input::icon));
                 c.pair("giving up after", giving_up_after.map(|x| format!("{x}")));
                 c
             }
@@ -375,26 +378,51 @@ impl Commands {
         }
     }
 
-    pub fn execute(&self, osascript: &str) -> Result<Data> {
-        if matches!(self, Commands::Mcp) {
-            anyhow::bail!("Cannot execute osascript for Mcp command");
-        }
+    fn execute_process(&self, osascript: &str) -> std::io::Result<std::process::Output> {
         let mut c = Cmd::new(osascript);
         let a = self.cmd();
         c.pair("-e", Some(&String::from(a)));
 
-        let child = std::process::Command::from(c)
+        log::debug!("cmd: {c:?}");
+
+        std::process::Command::from(c)
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
-            .spawn()?;
+            .spawn()?
+            .wait_with_output()
+    }
 
-        let output = child.wait_with_output()?;
+    pub fn execute(&self, osascript: &str) -> Result<Data> {
+        if matches!(self, Commands::Mcp) {
+            anyhow::bail!("Cannot execute osascript for Mcp command");
+        }
+        let output = self.execute_process(osascript)?;
         if output.status.success() {
             self.parse_stdout(output.stdout)
         } else {
             let msg = String::from_utf8(output.stderr).unwrap_or_else(|e| e.to_string());
             anyhow::bail!("{msg}")
+        }
+    }
+
+    pub fn execute_response(&self, osascript: &str) -> Response {
+        if matches!(self, Commands::Mcp) {
+            return anyhow::anyhow!("Cannot execute osascript for Mcp command").into();
+        }
+        match self.execute_process(osascript) {
+            Err(err) => Error::new(err).into(),
+            Ok(output) => {
+                if output.status.success() {
+                    Response::from(self.parse_stdout(output.stdout))
+                } else {
+                    let code = output.status.code();
+                    match String::from_utf8(output.stderr) {
+                        Ok(msg) => Response::from_err_with_code(anyhow::anyhow!(msg), code),
+                        Err(err) => Response::from_err_with_code(Error::new(err), code),
+                    }
+                }
+            }
         }
     }
 }
@@ -468,7 +496,43 @@ mod tests {
         let c = cmd.cmd();
         assert_eq!(
             String::from(c),
-            "display dialog \"enter name\" default answer \"alice\" hidden answer buttons {\"OK\"} default button 1 with title \"Login\" with icon \"note\" giving up after 30"
+            "display dialog \"enter name\" default answer \"alice\" hidden answer buttons {\"OK\"} default button 1 with title \"Login\" with icon note giving up after 30"
+        );
+    }
+
+    #[test]
+    fn test_dialog_cmd_icon_variants() {
+        let make_cmd = |icon: Option<String>| Commands::Dialog {
+            text: "test".to_string(),
+            default_answer: None,
+            hidden_answer: false,
+            buttons: vec![],
+            default_button: None,
+            cancel_button: None,
+            title: None,
+            icon,
+            giving_up_after: None,
+        };
+
+        assert_eq!(
+            String::from(make_cmd(Some("stop".to_string())).cmd()),
+            "display dialog \"test\" with icon stop"
+        );
+        assert_eq!(
+            String::from(make_cmd(Some("caution".to_string())).cmd()),
+            "display dialog \"test\" with icon caution"
+        );
+        assert_eq!(
+            String::from(make_cmd(Some("CAUTION".to_string())).cmd()),
+            "display dialog \"test\" with icon caution"
+        );
+        assert_eq!(
+            String::from(make_cmd(Some("1".to_string())).cmd()),
+            "display dialog \"test\" with icon 1"
+        );
+        assert_eq!(
+            String::from(make_cmd(Some("app.icns".to_string())).cmd()),
+            "display dialog \"test\" with icon \"app.icns\""
         );
     }
 
@@ -602,5 +666,36 @@ mod tests {
             giving_up_after: None,
         };
         assert!(cmd.parse_stdout(vec![0xff, 0xfe]).is_err());
+    }
+
+    #[test]
+    fn test_execute_response_success_mock() {
+        let cmd = Commands::Notification {
+            text: Some("hi".to_string()),
+            title: None,
+            subtitle: None,
+            sound_name: None,
+        };
+        let resp = cmd.execute_response("true");
+        assert!(!resp.is_err());
+    }
+
+    #[test]
+    fn test_execute_response_failure_mock() {
+        let cmd = Commands::Notification {
+            text: Some("hi".to_string()),
+            title: None,
+            subtitle: None,
+            sound_name: None,
+        };
+        let resp = cmd.execute_response("false");
+        assert!(resp.is_err());
+    }
+
+    #[test]
+    fn test_execute_response_mcp_rejected() {
+        let cmd = Commands::Mcp;
+        let resp = cmd.execute_response("true");
+        assert!(resp.is_err());
     }
 }

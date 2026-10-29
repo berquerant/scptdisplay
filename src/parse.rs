@@ -17,6 +17,17 @@ impl Input {
         }
     }
 
+    pub fn icon(x: &str) -> String {
+        const CONSTANTS: &[&str] = &["stop", "note", "caution"];
+        if let Some(&c) = CONSTANTS.iter().find(|&&c| c.eq_ignore_ascii_case(x)) {
+            c.to_string()
+        } else if x.parse::<u8>().is_ok() {
+            x.into()
+        } else {
+            Input::quoted(x)
+        }
+    }
+
     pub fn apple_script_list<S: Into<String>>(v: Vec<S>) -> String {
         let x = v
             .into_iter()
@@ -161,6 +172,30 @@ mod tests {
 
     test_input_integer_or_text!(test_integer_or_text_1, "1", "1");
     test_input_integer_or_text!(test_integer_or_text_one, "one", "\"one\"");
+
+    macro_rules! test_input_icon {
+        ($name:ident, $input:expr, $want:expr) => {
+            #[test]
+            fn $name() {
+                let got = Input::icon($input);
+                assert_eq!($want, got);
+            }
+        };
+    }
+
+    test_input_icon!(test_icon_stop, "stop", "stop");
+    test_input_icon!(test_icon_note, "note", "note");
+    test_input_icon!(test_icon_caution, "caution", "caution");
+    test_input_icon!(test_icon_note_uppercase, "NOTE", "note");
+    test_input_icon!(test_icon_0, "0", "0");
+    test_input_icon!(test_icon_1, "1", "1");
+    test_input_icon!(test_icon_2, "2", "2");
+    test_input_icon!(test_icon_custom, "custom.icns", "\"custom.icns\"");
+    test_input_icon!(
+        test_icon_injection,
+        "note\" & (do shell script \"pwned\")",
+        "\"note\\\" & (do shell script \\\"pwned\\\")\""
+    );
 
     macro_rules! test_input_apple_script_list {
         ($name:ident, $input:expr, $want:expr) => {
