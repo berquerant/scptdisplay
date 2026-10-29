@@ -115,10 +115,17 @@ pub struct DialogResult {
     pub record: HashMap<String, String>,
 }
 
+async fn execute_cmd(cmd: Commands, osascript: String) -> Result<Data, ErrorData> {
+    tokio::task::spawn_blocking(move || cmd.execute(&osascript))
+        .await
+        .map_err(|e| ErrorData::internal_error(format!("Task execution failed: {e}"), None))?
+        .map_err(|e| ErrorData::internal_error(e.to_string(), None))
+}
+
 #[tool_router(server_handler)]
 impl ScptdisplayMcpServer {
     #[tool(description = "Posts a macOS desktop notification banner using Notification Center")]
-    fn notification(
+    async fn notification(
         &self,
         Parameters(params): Parameters<NotificationParams>,
     ) -> Result<Json<NotificationResult>, ErrorData> {
@@ -136,14 +143,13 @@ impl ScptdisplayMcpServer {
             sound_name: params.sound_name,
         };
 
-        cmd.execute(&self.osascript)
-            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+        execute_cmd(cmd, self.osascript.clone()).await?;
 
         Ok(Json(NotificationResult { success: true }))
     }
 
     #[tool(description = "Displays a standardized macOS alert dialog with 1 to 3 buttons")]
-    fn alert(
+    async fn alert(
         &self,
         Parameters(params): Parameters<AlertParams>,
     ) -> Result<Json<AlertResult>, ErrorData> {
@@ -157,9 +163,7 @@ impl ScptdisplayMcpServer {
             giving_up_after: params.giving_up_after,
         };
 
-        let data = cmd
-            .execute(&self.osascript)
-            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+        let data = execute_cmd(cmd, self.osascript.clone()).await?;
 
         match data {
             Data::Alert {
@@ -182,7 +186,7 @@ impl ScptdisplayMcpServer {
     #[tool(
         description = "Displays an interactive macOS dialog with buttons and optional text field"
     )]
-    fn dialog(
+    async fn dialog(
         &self,
         Parameters(params): Parameters<DialogParams>,
     ) -> Result<Json<DialogResult>, ErrorData> {
@@ -198,9 +202,7 @@ impl ScptdisplayMcpServer {
             giving_up_after: params.giving_up_after,
         };
 
-        let data = cmd
-            .execute(&self.osascript)
-            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+        let data = execute_cmd(cmd, self.osascript.clone()).await?;
 
         match data {
             Data::Dialog {
@@ -242,8 +244,8 @@ pub async fn run_mcp_server_with_osascript(
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_notification_params_validation() {
+    #[tokio::test]
+    async fn test_notification_params_validation() {
         let server = ScptdisplayMcpServer::with_osascript("true");
         let params = NotificationParams {
             text: None,
@@ -251,11 +253,11 @@ mod tests {
             subtitle: None,
             sound_name: None,
         };
-        assert!(server.notification(Parameters(params)).is_err());
+        assert!(server.notification(Parameters(params)).await.is_err());
     }
 
-    #[test]
-    fn test_notification_execution_mock() {
+    #[tokio::test]
+    async fn test_notification_execution_mock() {
         let server = ScptdisplayMcpServer::with_osascript("true");
         let params = NotificationParams {
             text: Some("hello".to_string()),
@@ -263,12 +265,12 @@ mod tests {
             subtitle: None,
             sound_name: None,
         };
-        let res = server.notification(Parameters(params)).unwrap();
+        let res = server.notification(Parameters(params)).await.unwrap();
         assert_eq!(res.0, NotificationResult { success: true });
     }
 
-    #[test]
-    fn test_alert_execution_mock() {
+    #[tokio::test]
+    async fn test_alert_execution_mock() {
         let server = ScptdisplayMcpServer::with_osascript("echo");
         let params = AlertParams {
             text: "test".to_string(),
@@ -279,12 +281,12 @@ mod tests {
             cancel_button: None,
             giving_up_after: None,
         };
-        let res = server.alert(Parameters(params)).unwrap();
+        let res = server.alert(Parameters(params)).await.unwrap();
         assert_eq!(res.0.gave_up, false);
     }
 
-    #[test]
-    fn test_dialog_execution_mock() {
+    #[tokio::test]
+    async fn test_dialog_execution_mock() {
         let server = ScptdisplayMcpServer::with_osascript("echo");
         let params = DialogParams {
             text: "prompt".to_string(),
@@ -297,7 +299,7 @@ mod tests {
             icon: None,
             giving_up_after: None,
         };
-        let res = server.dialog(Parameters(params)).unwrap();
+        let res = server.dialog(Parameters(params)).await.unwrap();
         assert_eq!(res.0.gave_up, false);
     }
 }
