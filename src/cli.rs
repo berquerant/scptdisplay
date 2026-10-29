@@ -43,7 +43,7 @@ impl AlertType {
 #[command(version, about)]
 pub struct Cli {
     /// osascript command.
-    #[arg(long = "osascript", default_value = "osascript")]
+    #[arg(long = "osascript", default_value = "/usr/bin/osascript")]
     pub osascript: String,
     #[command(subcommand)]
     pub command: Commands,

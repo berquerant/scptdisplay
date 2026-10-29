@@ -16,7 +16,7 @@ pub struct ScptdisplayMcpServer {
 impl ScptdisplayMcpServer {
     pub fn new() -> Self {
         Self {
-            osascript: "osascript".to_string(),
+            osascript: "/usr/bin/osascript".to_string(),
         }
     }
 
@@ -224,7 +224,7 @@ impl ScptdisplayMcpServer {
 }
 
 pub async fn run_mcp_server() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    run_mcp_server_with_osascript("osascript").await
+    run_mcp_server_with_osascript("/usr/bin/osascript").await
 }
 
 pub async fn run_mcp_server_with_osascript(
