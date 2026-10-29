@@ -26,7 +26,7 @@ Commands:
   help          Print this message or the help of the given subcommand(s)
 
 Options:
-      --osascript <OSASCRIPT>  osascript command [default: osascript]
+      --osascript <OSASCRIPT>  osascript command [default: /usr/bin/osascript]
   -h, --help                   Print help (see more with '--help')
   -V, --version                Print version
 ```
@@ -124,7 +124,7 @@ The command outputs a JSON object to `stdout`:
   "error": null,
   "data": {
     "dialog": {
-      "raw": "button returned:OK, text returned:Alice, gave up:false\n",
+      "raw": "{button returned:\"OK\", text returned:\"Alice\", gave up:false}\n",
       "record": {
         "button returned": "OK",
         "text returned": "Alice",

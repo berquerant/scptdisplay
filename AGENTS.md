@@ -33,7 +33,7 @@ When making structural changes to the project (adding or modifying CLI subcomman
 | `mcp` | — | Model Context Protocol (MCP) server over stdio | — |
 
 ### CLI Options
-- `--osascript <OSASCRIPT>`: Path or name of the osascript binary (defaults to `osascript`). Can be pointed to a mock or wrapper script for automated testing.
+- `--osascript <OSASCRIPT>`: Path or name of the osascript binary (defaults to `/usr/bin/osascript`). Can be pointed to a mock or wrapper script for automated testing.
 
 ---
 
@@ -108,16 +108,21 @@ Always ensure `cargo test`, `cargo clippy -- -D warnings`, and `cargo fmt -- --c
 - **AppleScript String Literals**:
   - Never interpolate raw user input into AppleScript command strings.
   - Always use `Input::quoted()` in `src/parse.rs`, which escapes backslashes (`\` → `\\`) and double quotes (`"` → `\"`) to prevent string boundary breakouts and arbitrary AppleScript command injection (`do shell script`).
+- **Standard Input Payload Delivery**:
+  - Always pass AppleScript command payloads to `osascript` via `stdin` piping rather than command-line arguments (`-e`). This prevents sensitive prompts and passwords from being exposed in process table listings (`ps aux`) and avoids OS command-line length limits (`ARG_MAX`).
 - **Enumerations for Options**:
   - Arguments that map to unquoted AppleScript keywords (such as `--as` in `alert`) must be constrained using `clap::ValueEnum` (e.g. `AlertType`) rather than free-form `String`.
 
-### 6.3 Record Output Parsing
-- AppleScript dialog records format output as `button returned:..., text returned:..., gave up:...`.
-- `Output::record` in `src/parse.rs` recognizes these known field keys and preserves embedded commas and colons inside `text returned` without truncating user input.
+### 6.3 Record Output Parsing & Response Integrity
+- AppleScript execution passes `-s s` to format record output in AppleScript source notation (`{button returned:"...", text returned:"...", gave up:false}`).
+- `Output::record` in `src/parse.rs` lexes this quoted structure safely, ensuring embedded commas, colons, or injected keywords (e.g. `button returned:...`) inside user text cannot spoof or overwrite parsed fields.
+- Legacy unquoted output parsing is retained as a fallback.
 
-### 6.4 Defensive Design & Zero Panic Rule
+### 6.4 Defensive Design & Concurrency Protection
 - Avoid unhandled `.unwrap()` on user input or process I/O.
 - Conversions (`From<Cmd> for String`, `From<Cmd> for Command`) must safely handle empty command vectors without panicking.
+- In the MCP server (`src/mcp.rs`), synchronous child process executions are offloaded to `tokio::task::spawn_blocking` to avoid starving the async Tokio runtime when awaiting user dialog interactions.
+- Dialog and alert buttons are validated to enforce AppleScript's upper limit of 3 buttons.
 
 ---
 
