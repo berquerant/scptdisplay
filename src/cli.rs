@@ -241,7 +241,10 @@ pub enum Commands {
 
 impl Cli {
     pub fn cmd(&self) -> Cmd {
-        Cmd::new(&self.osascript)
+        let mut c = Cmd::new(&self.osascript);
+        c.arg(Some("-s"));
+        c.arg(Some("s"));
+        c
     }
     pub fn script(&self) -> Cmd {
         self.command.cmd()
@@ -383,6 +386,8 @@ impl Commands {
         log::debug!("osascript: {osascript}, script: {script}");
 
         let mut child = std::process::Command::new(osascript)
+            .arg("-s")
+            .arg("s")
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
@@ -551,9 +556,72 @@ mod tests {
             },
         };
         let c = cli.cmd();
-        assert_eq!(String::from(c), "osascript");
+        assert_eq!(String::from(c), "osascript -s s");
         let s = cli.script();
         assert_eq!(String::from(s), "display notification \"hi\"");
+    }
+
+    #[test]
+    fn test_parse_stdout_alert_source_format() {
+        let cmd = Commands::Alert {
+            text: "hi".to_string(),
+            message: None,
+            alert_type: AlertType::Informational,
+            buttons: vec![],
+            default_button: None,
+            cancel_button: None,
+            giving_up_after: None,
+        };
+        let raw = b"{button returned:\"OK\", gave up:false}".to_vec();
+        let data = cmd.parse_stdout(raw).unwrap();
+        assert_eq!(
+            data,
+            Data::Alert {
+                raw: "{button returned:\"OK\", gave up:false}".to_string(),
+                record: HashMap::from([
+                    ("button returned".to_string(), "OK".to_string()),
+                    ("gave up".to_string(), "false".to_string()),
+                ]),
+                button: Some("OK".to_string()),
+                gave_up: false,
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_stdout_dialog_source_format_spoofing_defense() {
+        let cmd = Commands::Dialog {
+            text: "hi".to_string(),
+            default_answer: None,
+            hidden_answer: false,
+            buttons: vec![],
+            default_button: None,
+            cancel_button: None,
+            title: None,
+            icon: None,
+            giving_up_after: None,
+        };
+        let raw =
+            b"{button returned:\"Cancel\", text returned:\"evil, button returned:OK, gave up:true\", gave up:false}"
+                .to_vec();
+        let data = cmd.parse_stdout(raw).unwrap();
+        assert_eq!(
+            data,
+            Data::Dialog {
+                raw: "{button returned:\"Cancel\", text returned:\"evil, button returned:OK, gave up:true\", gave up:false}".to_string(),
+                record: HashMap::from([
+                    ("button returned".to_string(), "Cancel".to_string()),
+                    (
+                        "text returned".to_string(),
+                        "evil, button returned:OK, gave up:true".to_string()
+                    ),
+                    ("gave up".to_string(), "false".to_string()),
+                ]),
+                text: Some("evil, button returned:OK, gave up:true".to_string()),
+                button: Some("Cancel".to_string()),
+                gave_up: false,
+            }
+        );
     }
 
     #[test]

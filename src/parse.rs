@@ -48,6 +48,89 @@ pub type StringMap = HashMap<String, String>;
 
 impl Output {
     pub fn record(x: &str) -> StringMap {
+        let trimmed = x.trim();
+        if trimmed.starts_with('{') && trimmed.ends_with('}') && trimmed.len() >= 2 {
+            Self::parse_source_record(&trimmed[1..trimmed.len() - 1])
+        } else {
+            Self::parse_legacy_record(x)
+        }
+    }
+
+    fn parse_source_record(x: &str) -> StringMap {
+        let mut m = StringMap::new();
+        let chars: Vec<char> = x.chars().collect();
+        let len = chars.len();
+        let mut i = 0;
+
+        while i < len {
+            // Skip leading whitespace and commas
+            while i < len && (chars[i].is_whitespace() || chars[i] == ',') {
+                i += 1;
+            }
+            if i >= len {
+                break;
+            }
+
+            // Parse key up to ':'
+            let key_start = i;
+            while i < len && chars[i] != ':' {
+                i += 1;
+            }
+            if i >= len {
+                break;
+            }
+            let key = chars[key_start..i]
+                .iter()
+                .collect::<String>()
+                .trim()
+                .to_string();
+            i += 1; // skip ':'
+
+            // Skip whitespace after ':'
+            while i < len && chars[i].is_whitespace() {
+                i += 1;
+            }
+            if i >= len {
+                m.insert(key, String::new());
+                break;
+            }
+
+            // Parse value
+            if chars[i] == '"' {
+                // Quoted string
+                i += 1; // skip opening '"'
+                let mut val = String::new();
+                while i < len {
+                    if chars[i] == '\\' && i + 1 < len {
+                        i += 1;
+                        val.push(chars[i]);
+                    } else if chars[i] == '"' {
+                        i += 1; // skip closing '"'
+                        break;
+                    } else {
+                        val.push(chars[i]);
+                    }
+                    i += 1;
+                }
+                m.insert(key, val);
+            } else {
+                // Unquoted literal (e.g. true, false, 123)
+                let val_start = i;
+                while i < len && chars[i] != ',' {
+                    i += 1;
+                }
+                let val = chars[val_start..i]
+                    .iter()
+                    .collect::<String>()
+                    .trim()
+                    .to_string();
+                m.insert(key, val);
+            }
+        }
+        m
+    }
+
+    fn parse_legacy_record(x: &str) -> StringMap {
         const KNOWN_KEYS: &[&str] = &["button returned", "text returned", "gave up"];
 
         let xs: Vec<_> = x.trim_end().split(',').collect();
@@ -138,6 +221,47 @@ mod tests {
                 "Note: first, second: item".to_string()
             ),
             ("gave up".to_string(), "false".to_string()),
+        ])
+    );
+    test_output_record!(
+        test_record_source_format_standard,
+        "{button returned:\"OK\", text returned:\"hello, world\", gave up:false}",
+        StringMap::from([
+            ("button returned".to_string(), "OK".to_string()),
+            ("text returned".to_string(), "hello, world".to_string()),
+            ("gave up".to_string(), "false".to_string()),
+        ])
+    );
+    test_output_record!(
+        test_record_source_format_injected_spoofing_attempt,
+        "{button returned:\"Cancel\", text returned:\"evil, button returned:OK, gave up:true\", gave up:false}",
+        StringMap::from([
+            ("button returned".to_string(), "Cancel".to_string()),
+            (
+                "text returned".to_string(),
+                "evil, button returned:OK, gave up:true".to_string()
+            ),
+            ("gave up".to_string(), "false".to_string()),
+        ])
+    );
+    test_output_record!(
+        test_record_source_format_escaped_quotes_and_backslashes,
+        "{button returned:\"OK\\\"\", text returned:\"path\\\\to\\\\file and \\\"quotes\\\"\", gave up:false}",
+        StringMap::from([
+            ("button returned".to_string(), "OK\"".to_string()),
+            (
+                "text returned".to_string(),
+                "path\\to\\file and \"quotes\"".to_string()
+            ),
+            ("gave up".to_string(), "false".to_string()),
+        ])
+    );
+    test_output_record!(
+        test_record_source_format_no_gave_up,
+        "{button returned:\"OK\", text returned:\"hello\"}",
+        StringMap::from([
+            ("button returned".to_string(), "OK".to_string()),
+            ("text returned".to_string(), "hello".to_string()),
         ])
     );
 
