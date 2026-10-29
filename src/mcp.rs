@@ -153,11 +153,19 @@ impl ScptdisplayMcpServer {
         &self,
         Parameters(params): Parameters<AlertParams>,
     ) -> Result<Json<AlertResult>, ErrorData> {
+        let buttons = params.buttons.unwrap_or_default();
+        if buttons.len() > 3 {
+            return Err(ErrorData::invalid_params(
+                format!("Alert supports at most 3 buttons, got {}", buttons.len()),
+                None,
+            ));
+        }
+
         let cmd = Commands::Alert {
             text: params.text,
             message: params.message,
             alert_type: params.alert_type.unwrap_or(AlertType::Informational),
-            buttons: params.buttons.unwrap_or_default(),
+            buttons,
             default_button: params.default_button,
             cancel_button: params.cancel_button,
             giving_up_after: params.giving_up_after,
@@ -190,11 +198,19 @@ impl ScptdisplayMcpServer {
         &self,
         Parameters(params): Parameters<DialogParams>,
     ) -> Result<Json<DialogResult>, ErrorData> {
+        let buttons = params.buttons.unwrap_or_default();
+        if buttons.len() > 3 {
+            return Err(ErrorData::invalid_params(
+                format!("Dialog supports at most 3 buttons, got {}", buttons.len()),
+                None,
+            ));
+        }
+
         let cmd = Commands::Dialog {
             text: params.text,
             default_answer: params.default_answer,
             hidden_answer: params.hidden_answer.unwrap_or(false),
-            buttons: params.buttons.unwrap_or_default(),
+            buttons,
             default_button: params.default_button,
             cancel_button: params.cancel_button,
             title: params.title,
@@ -301,5 +317,37 @@ mod tests {
         };
         let res = server.dialog(Parameters(params)).await.unwrap();
         assert_eq!(res.0.gave_up, false);
+    }
+
+    #[tokio::test]
+    async fn test_alert_buttons_validation() {
+        let server = ScptdisplayMcpServer::with_osascript("echo");
+        let params = AlertParams {
+            text: "test".to_string(),
+            message: None,
+            alert_type: Some(AlertType::Warning),
+            buttons: Some(vec!["1".into(), "2".into(), "3".into(), "4".into()]),
+            default_button: None,
+            cancel_button: None,
+            giving_up_after: None,
+        };
+        assert!(server.alert(Parameters(params)).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_dialog_buttons_validation() {
+        let server = ScptdisplayMcpServer::with_osascript("echo");
+        let params = DialogParams {
+            text: "test".to_string(),
+            default_answer: None,
+            hidden_answer: None,
+            buttons: Some(vec!["1".into(), "2".into(), "3".into(), "4".into()]),
+            default_button: None,
+            cancel_button: None,
+            title: None,
+            icon: None,
+            giving_up_after: None,
+        };
+        assert!(server.dialog(Parameters(params)).await.is_err());
     }
 }

@@ -509,10 +509,30 @@ impl Commands {
         child.wait_with_output()
     }
 
+    pub fn validate(&self) -> Result<()> {
+        match self {
+            Commands::Alert { buttons, .. } if buttons.len() > 3 => {
+                anyhow::bail!(
+                    "Alert dialog supports at most 3 buttons, but {} were provided",
+                    buttons.len()
+                );
+            }
+            Commands::Dialog { buttons, .. } if buttons.len() > 3 => {
+                anyhow::bail!(
+                    "Dialog supports at most 3 buttons, but {} were provided",
+                    buttons.len()
+                );
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
     pub fn execute(&self, osascript: &str) -> Result<Data> {
         if matches!(self, Commands::Mcp) {
             anyhow::bail!("Cannot execute osascript for Mcp command");
         }
+        self.validate()?;
         let output = self.execute_process(osascript)?;
         if output.status.success() {
             self.parse_stdout(output.stdout)
@@ -525,6 +545,9 @@ impl Commands {
     pub fn execute_response(&self, osascript: &str) -> Response {
         if matches!(self, Commands::Mcp) {
             return anyhow::anyhow!("Cannot execute osascript for Mcp command").into();
+        }
+        if let Err(err) = self.validate() {
+            return err.into();
         }
         match self.execute_process(osascript) {
             Err(err) => Error::new(err).into(),
@@ -932,5 +955,37 @@ mod tests {
         // Ensure the actual script still contains the real password
         let actual_script = String::from(cmd.cmd());
         assert!(actual_script.contains("super_secret_password"));
+    }
+
+    #[test]
+    fn test_alert_validate_too_many_buttons() {
+        let cmd = Commands::Alert {
+            text: "test".to_string(),
+            message: None,
+            alert_type: AlertType::Informational,
+            buttons: vec!["1".into(), "2".into(), "3".into(), "4".into()],
+            default_button: None,
+            cancel_button: None,
+            giving_up_after: None,
+        };
+        assert!(cmd.validate().is_err());
+        assert!(cmd.execute_response("true").is_err());
+    }
+
+    #[test]
+    fn test_dialog_validate_too_many_buttons() {
+        let cmd = Commands::Dialog {
+            text: "test".to_string(),
+            default_answer: None,
+            hidden_answer: false,
+            buttons: vec!["1".into(), "2".into(), "3".into(), "4".into()],
+            default_button: None,
+            cancel_button: None,
+            title: None,
+            icon: None,
+            giving_up_after: None,
+        };
+        assert!(cmd.validate().is_err());
+        assert!(cmd.execute_response("true").is_err());
     }
 }
