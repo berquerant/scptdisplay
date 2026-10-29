@@ -5,6 +5,7 @@ use anyhow::{Error, Result};
 use clap::{self, Parser, Subcommand, ValueEnum};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Serialize, Deserialize, JsonSchema)]
 pub enum AlertType {
@@ -49,7 +50,7 @@ pub struct Cli {
     pub command: Commands,
 }
 
-#[derive(Debug, Subcommand)]
+#[derive(Subcommand)]
 pub enum Commands {
     /// Posts a notification using the Notification Center, containing a title, subtitle, and explanation, and optionally playing a sound.
     ///
@@ -239,6 +240,73 @@ pub enum Commands {
     Mcp,
 }
 
+impl fmt::Debug for Commands {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Commands::Notification {
+                text,
+                title,
+                subtitle,
+                sound_name,
+            } => f
+                .debug_struct("Notification")
+                .field("text", text)
+                .field("title", title)
+                .field("subtitle", subtitle)
+                .field("sound_name", sound_name)
+                .finish(),
+            Commands::Alert {
+                text,
+                message,
+                alert_type,
+                buttons,
+                default_button,
+                cancel_button,
+                giving_up_after,
+            } => f
+                .debug_struct("Alert")
+                .field("text", text)
+                .field("message", message)
+                .field("alert_type", alert_type)
+                .field("buttons", buttons)
+                .field("default_button", default_button)
+                .field("cancel_button", cancel_button)
+                .field("giving_up_after", giving_up_after)
+                .finish(),
+            Commands::Dialog {
+                text,
+                default_answer,
+                hidden_answer,
+                buttons,
+                default_button,
+                cancel_button,
+                title,
+                icon,
+                giving_up_after,
+            } => {
+                let redacted_answer: Option<String> = if *hidden_answer && default_answer.is_some()
+                {
+                    Some("[REDACTED]".to_string())
+                } else {
+                    default_answer.clone()
+                };
+                f.debug_struct("Dialog")
+                    .field("text", text)
+                    .field("default_answer", &redacted_answer)
+                    .field("hidden_answer", hidden_answer)
+                    .field("buttons", buttons)
+                    .field("default_button", default_button)
+                    .field("cancel_button", cancel_button)
+                    .field("title", title)
+                    .field("icon", icon)
+                    .field("giving_up_after", giving_up_after)
+                    .finish()
+            }
+            Commands::Mcp => write!(f, "Mcp"),
+        }
+    }
+}
+
 impl Cli {
     pub fn cmd(&self) -> Cmd {
         let mut c = Cmd::new(&self.osascript);
@@ -381,9 +449,49 @@ impl Commands {
         }
     }
 
+    fn script_for_logging(&self) -> String {
+        match self {
+            Commands::Dialog {
+                text,
+                default_answer,
+                hidden_answer: true,
+                buttons,
+                default_button,
+                cancel_button,
+                title,
+                icon,
+                giving_up_after,
+            } if default_answer.is_some() => {
+                let mut c = Cmd::new("display dialog");
+                c.arg(Some(Input::quoted(text)));
+                c.pair("default answer", Some(Input::quoted("[REDACTED]")));
+                c.arg(Some("hidden answer"));
+                if !buttons.is_empty() {
+                    c.pair("buttons", Some(Input::apple_script_list(buttons.clone())));
+                }
+                c.pair(
+                    "default button",
+                    default_button.as_deref().map(Input::integer_or_text),
+                );
+                c.pair(
+                    "cancel button",
+                    cancel_button.as_deref().map(Input::integer_or_text),
+                );
+                c.pair("with title", title.as_deref().map(Input::quoted));
+                c.pair("with icon", icon.as_deref().map(Input::icon));
+                c.pair("giving up after", giving_up_after.map(|x| format!("{x}")));
+                String::from(c)
+            }
+            _ => String::from(self.cmd()),
+        }
+    }
+
     fn execute_process(&self, osascript: &str) -> std::io::Result<std::process::Output> {
         let script = String::from(self.cmd());
-        log::debug!("osascript: {osascript}, script: {script}");
+        log::debug!(
+            "osascript: {osascript}, script: {}",
+            self.script_for_logging()
+        );
 
         let mut child = std::process::Command::new(osascript)
             .arg("-s")
@@ -770,5 +878,59 @@ mod tests {
         let cmd = Commands::Mcp;
         let resp = cmd.execute_response("true");
         assert!(resp.is_err());
+    }
+
+    #[test]
+    fn test_commands_dialog_debug_redaction() {
+        let cmd = Commands::Dialog {
+            text: "prompt".to_string(),
+            default_answer: Some("super_secret_password".to_string()),
+            hidden_answer: true,
+            buttons: vec![],
+            default_button: None,
+            cancel_button: None,
+            title: None,
+            icon: None,
+            giving_up_after: None,
+        };
+        let debug_str = format!("{cmd:?}");
+        assert!(!debug_str.contains("super_secret_password"));
+        assert!(debug_str.contains("[REDACTED]"));
+
+        let non_hidden = Commands::Dialog {
+            text: "prompt".to_string(),
+            default_answer: Some("public_value".to_string()),
+            hidden_answer: false,
+            buttons: vec![],
+            default_button: None,
+            cancel_button: None,
+            title: None,
+            icon: None,
+            giving_up_after: None,
+        };
+        let non_hidden_debug = format!("{non_hidden:?}");
+        assert!(non_hidden_debug.contains("public_value"));
+    }
+
+    #[test]
+    fn test_commands_dialog_script_for_logging_redaction() {
+        let cmd = Commands::Dialog {
+            text: "prompt".to_string(),
+            default_answer: Some("super_secret_password".to_string()),
+            hidden_answer: true,
+            buttons: vec![],
+            default_button: None,
+            cancel_button: None,
+            title: None,
+            icon: None,
+            giving_up_after: None,
+        };
+        let script_log = cmd.script_for_logging();
+        assert!(!script_log.contains("super_secret_password"));
+        assert!(script_log.contains("[REDACTED]"));
+
+        // Ensure the actual script still contains the real password
+        let actual_script = String::from(cmd.cmd());
+        assert!(actual_script.contains("super_secret_password"));
     }
 }
