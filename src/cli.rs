@@ -241,10 +241,10 @@ pub enum Commands {
 
 impl Cli {
     pub fn cmd(&self) -> Cmd {
-        let mut c = Cmd::new(&self.osascript);
-        let a = self.command.cmd();
-        c.pair("-e", Some(&String::from(a)));
-        c
+        Cmd::new(&self.osascript)
+    }
+    pub fn script(&self) -> Cmd {
+        self.command.cmd()
     }
     pub fn parse_stdout(&self, output: Vec<u8>) -> Result<Data> {
         self.command.parse_stdout(output)
@@ -379,18 +379,21 @@ impl Commands {
     }
 
     fn execute_process(&self, osascript: &str) -> std::io::Result<std::process::Output> {
-        let mut c = Cmd::new(osascript);
-        let a = self.cmd();
-        c.pair("-e", Some(&String::from(a)));
+        let script = String::from(self.cmd());
+        log::debug!("osascript: {osascript}, script: {script}");
 
-        log::debug!("cmd: {c:?}");
-
-        std::process::Command::from(c)
-            .stdin(std::process::Stdio::null())
+        let mut child = std::process::Command::new(osascript)
+            .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
-            .spawn()?
-            .wait_with_output()
+            .spawn()?;
+
+        if let Some(mut stdin) = child.stdin.take() {
+            use std::io::Write;
+            let _ = stdin.write_all(script.as_bytes());
+        }
+
+        child.wait_with_output()
     }
 
     pub fn execute(&self, osascript: &str) -> Result<Data> {
@@ -548,7 +551,9 @@ mod tests {
             },
         };
         let c = cli.cmd();
-        assert_eq!(String::from(c), "osascript -e display notification \"hi\"");
+        assert_eq!(String::from(c), "osascript");
+        let s = cli.script();
+        assert_eq!(String::from(s), "display notification \"hi\"");
     }
 
     #[test]
