@@ -55,7 +55,7 @@ scptdisplay/
 │   └── response.rs          # Unified JSON `Response`, status `Code`, and subcommand `Data` models
 ├── Cargo.lock               # Cargo dependency lockfile
 ├── Cargo.toml               # Package manifest and dependencies
-├── Makefile.toml            # `cargo-make` task definitions (`test`, `lint`, `format`, `clippy`, `ci`)
+├── Makefile                 # Make task definitions (`test`, `lint`, `format`, `clippy`, `ci`)
 ├── README.md                # User-facing documentation and usage guide
 └── AGENTS.md                # Agent operational guide and architecture documentation
 ```
@@ -64,17 +64,20 @@ scptdisplay/
 
 ## 5. Development Tasks & Verification Commands
 
-All development tasks should be verified with Cargo or `cargo-make`:
+All development tasks should be verified with Cargo or `make`:
 
 ```shell
 # Run unit tests
 cargo test
+# or: make test
 
 # Run linter checks (fail on warnings)
 cargo clippy -- -D warnings
+# or: make clippy
 
 # Check code formatting
 cargo fmt --all -- --check
+# or: make format
 
 # Format code
 cargo fmt --all
@@ -82,8 +85,8 @@ cargo fmt --all
 # Run security audit on dependencies
 cargo audit
 
-# Run full CI suite via cargo-make (if installed)
-cargo make ci
+# Run full CI suite via make
+make ci
 ```
 
 ### Pre-Completion Rule
