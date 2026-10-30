@@ -48,7 +48,12 @@ scptdisplay/
 ├── src/
 │   ├── lib.rs               # Library root re-exporting modules for internal and external use
 │   ├── main.rs              # Application entry point: logging, argument parsing, child process execution, exit status handling
-│   ├── cli.rs               # Clap CLI definition (`Cli`, `Commands`, `AlertType`), AppleScript command synthesis, and response parsing
+│   ├── cli/                 # CLI module: argument parsing, AppleScript synthesis, and process execution
+│   │   ├── mod.rs           # CLI module root and `Cli` wrapper methods
+│   │   ├── args.rs          # Clap CLI definition (`Cli`, `Commands`, `AlertType`) and debug redaction
+│   │   ├── exec.rs          # Process execution, button count validation, and stdout parsing
+│   │   ├── origin.rs        # Anti-spoofing origin attribution helpers and formatting
+│   │   └── script.rs        # AppleScript command synthesis and logging scripts
 │   ├── cmd.rs               # `Cmd` abstraction managing process command vectors and argument construction
 │   ├── mcp.rs               # Model Context Protocol (MCP) stdio server implementation using `rmcp`
 │   ├── parse.rs             # AppleScript input escaping (`Input`) and record output parsing (`Output`)
