@@ -129,7 +129,7 @@ Always ensure `cargo test`, `cargo clippy -- -D warnings`, and `cargo fmt -- --c
 ## 7. macOS Environment Prerequisites
 
 When testing or running `scptdisplay` locally on macOS:
-- `osascript` must be available in `PATH`.
+- `/usr/bin/osascript` must be available on the system (or a custom command specified via `--osascript` must be resolvable in `PATH`).
 - Terminal emulators or calling agents require macOS automation permissions under:
   `System Settings > Privacy & Security > Automation` (System Events).
 - Banner notifications require notifications to be enabled under:
