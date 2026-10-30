@@ -124,6 +124,13 @@ Always ensure `cargo test`, `cargo clippy -- -D warnings`, and `cargo fmt -- --c
 - In the MCP server (`src/mcp.rs`), synchronous child process executions are offloaded to `tokio::task::spawn_blocking` to avoid starving the async Tokio runtime when awaiting user dialog interactions.
 - Dialog and alert buttons are validated to enforce AppleScript's upper limit of 3 buttons.
 
+### 6.5 Anti-Spoofing & Origin Attribution
+- All displayed notifications, alerts, and dialogs automatically identify `scptdisplay` as their source to prevent notification spoofing, phishing, and deceptive system dialogs:
+  - **Notification**: Sets `subtitle` to `"via scptdisplay"` if omitted, or appends `\n(via scptdisplay)` to `text` when a custom `subtitle` without `scptdisplay` is provided.
+  - **Alert**: Sets `message` to `"(via scptdisplay)"` if omitted, or appends `\n(via scptdisplay)` to existing `message`.
+  - **Dialog**: Appends `\n(via scptdisplay)` to the prompt `text` and defaults the window title to `"scptdisplay"` if omitted.
+- This origin attribution is enforced uniformly in `Commands::cmd` for both direct CLI invocations and MCP server tool calls with no opt-out mechanism.
+
 ---
 
 ## 7. macOS Environment Prerequisites

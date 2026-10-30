@@ -325,6 +325,46 @@ impl Cli {
     }
 }
 
+pub(crate) const ORIGIN_TAG: &str = "(via scptdisplay)";
+pub(crate) const ORIGIN_NAME: &str = "scptdisplay";
+
+pub(crate) fn append_origin_tag(text: &str) -> String {
+    if text.contains(ORIGIN_TAG) {
+        text.to_string()
+    } else if text.is_empty() {
+        ORIGIN_TAG.to_string()
+    } else {
+        format!("{}\n{ORIGIN_TAG}", text.trim_end())
+    }
+}
+
+pub(crate) fn format_notification_origin(
+    text: Option<&str>,
+    subtitle: Option<&str>,
+) -> (String, Option<String>) {
+    let body = text.unwrap_or("");
+    match subtitle {
+        None => (body.to_string(), Some(format!("via {ORIGIN_NAME}"))),
+        Some(s) if s.contains(ORIGIN_NAME) => (body.to_string(), Some(s.to_string())),
+        Some(s) => (append_origin_tag(body), Some(s.to_string())),
+    }
+}
+
+pub(crate) fn format_alert_message_origin(message: Option<&str>) -> Option<String> {
+    match message {
+        None | Some("") => Some(ORIGIN_TAG.to_string()),
+        Some(m) if m.contains(ORIGIN_TAG) => Some(m.to_string()),
+        Some(m) => Some(format!("{}\n{ORIGIN_TAG}", m.trim_end())),
+    }
+}
+
+pub(crate) fn format_dialog_title_origin(title: Option<&str>) -> Option<String> {
+    match title {
+        None | Some("") => Some(ORIGIN_NAME.to_string()),
+        Some(t) => Some(t.to_string()),
+    }
+}
+
 impl Commands {
     fn cmd(&self) -> Cmd {
         match self {
@@ -335,10 +375,14 @@ impl Commands {
                 sound_name,
             } => {
                 let mut c = Cmd::new("display notification");
-                let body = text.as_deref().unwrap_or("");
-                c.arg(Some(Input::quoted(body)));
+                let (body, subtitle_with_origin) =
+                    format_notification_origin(text.as_deref(), subtitle.as_deref());
+                c.arg(Some(Input::quoted(&body)));
                 c.pair("with title", title.as_deref().map(Input::quoted));
-                c.pair("subtitle", subtitle.as_deref().map(Input::quoted));
+                c.pair(
+                    "subtitle",
+                    subtitle_with_origin.as_deref().map(Input::quoted),
+                );
                 c.pair("sound name", sound_name.as_deref().map(Input::quoted));
                 c
             }
@@ -353,7 +397,8 @@ impl Commands {
             } => {
                 let mut c = Cmd::new("display alert");
                 c.arg(Some(Input::quoted(text)));
-                c.pair("message", message.as_deref().map(Input::quoted));
+                let message_with_origin = format_alert_message_origin(message.as_deref());
+                c.pair("message", message_with_origin.as_deref().map(Input::quoted));
                 c.pair("as", Some(alert_type.as_str()));
                 if !buttons.is_empty() {
                     c.pair("buttons", Some(Input::apple_script_list(buttons.clone())));
@@ -381,7 +426,9 @@ impl Commands {
                 giving_up_after,
             } => {
                 let mut c = Cmd::new("display dialog");
-                c.arg(Some(Input::quoted(text)));
+                let text_with_origin = append_origin_tag(text);
+                let title_with_origin = format_dialog_title_origin(title.as_deref());
+                c.arg(Some(Input::quoted(&text_with_origin)));
                 c.pair(
                     "default answer",
                     default_answer.as_deref().map(Input::quoted),
@@ -398,7 +445,10 @@ impl Commands {
                     "cancel button",
                     cancel_button.as_deref().map(Input::integer_or_text),
                 );
-                c.pair("with title", title.as_deref().map(Input::quoted));
+                c.pair(
+                    "with title",
+                    title_with_origin.as_deref().map(Input::quoted),
+                );
                 c.pair("with icon", icon.as_deref().map(Input::icon));
                 c.pair("giving up after", giving_up_after.map(|x| format!("{x}")));
                 c
@@ -463,7 +513,9 @@ impl Commands {
                 giving_up_after,
             } if default_answer.is_some() => {
                 let mut c = Cmd::new("display dialog");
-                c.arg(Some(Input::quoted(text)));
+                let text_with_origin = append_origin_tag(text);
+                let title_with_origin = format_dialog_title_origin(title.as_deref());
+                c.arg(Some(Input::quoted(&text_with_origin)));
                 c.pair("default answer", Some(Input::quoted("[REDACTED]")));
                 c.arg(Some("hidden answer"));
                 if !buttons.is_empty() {
@@ -477,7 +529,10 @@ impl Commands {
                     "cancel button",
                     cancel_button.as_deref().map(Input::integer_or_text),
                 );
-                c.pair("with title", title.as_deref().map(Input::quoted));
+                c.pair(
+                    "with title",
+                    title_with_origin.as_deref().map(Input::quoted),
+                );
                 c.pair("with icon", icon.as_deref().map(Input::icon));
                 c.pair("giving up after", giving_up_after.map(|x| format!("{x}")));
                 String::from(c)
@@ -582,7 +637,7 @@ mod tests {
         let c = cmd.cmd();
         assert_eq!(
             String::from(c),
-            "display notification \"body\" with title \"title\" subtitle \"subtitle\" sound name \"Ping\""
+            "display notification \"body\n(via scptdisplay)\" with title \"title\" subtitle \"subtitle\" sound name \"Ping\""
         );
     }
 
@@ -597,7 +652,7 @@ mod tests {
         let c = cmd.cmd();
         assert_eq!(
             String::from(c),
-            "display notification \"\" with title \"title\""
+            "display notification \"\" with title \"title\" subtitle \"via scptdisplay\""
         );
     }
 
@@ -615,7 +670,7 @@ mod tests {
         let c = cmd.cmd();
         assert_eq!(
             String::from(c),
-            "display alert \"alert text\" message \"alert message\" as warning buttons {\"Cancel\",\"OK\"} default button 2 cancel button 1 giving up after 10"
+            "display alert \"alert text\" message \"alert message\n(via scptdisplay)\" as warning buttons {\"Cancel\",\"OK\"} default button 2 cancel button 1 giving up after 10"
         );
     }
 
@@ -635,7 +690,7 @@ mod tests {
         let c = cmd.cmd();
         assert_eq!(
             String::from(c),
-            "display dialog \"enter name\" default answer \"alice\" hidden answer buttons {\"OK\"} default button 1 with title \"Login\" with icon note giving up after 30"
+            "display dialog \"enter name\n(via scptdisplay)\" default answer \"alice\" hidden answer buttons {\"OK\"} default button 1 with title \"Login\" with icon note giving up after 30"
         );
     }
 
@@ -655,23 +710,23 @@ mod tests {
 
         assert_eq!(
             String::from(make_cmd(Some("stop".to_string())).cmd()),
-            "display dialog \"test\" with icon stop"
+            "display dialog \"test\n(via scptdisplay)\" with title \"scptdisplay\" with icon stop"
         );
         assert_eq!(
             String::from(make_cmd(Some("caution".to_string())).cmd()),
-            "display dialog \"test\" with icon caution"
+            "display dialog \"test\n(via scptdisplay)\" with title \"scptdisplay\" with icon caution"
         );
         assert_eq!(
             String::from(make_cmd(Some("CAUTION".to_string())).cmd()),
-            "display dialog \"test\" with icon caution"
+            "display dialog \"test\n(via scptdisplay)\" with title \"scptdisplay\" with icon caution"
         );
         assert_eq!(
             String::from(make_cmd(Some("1".to_string())).cmd()),
-            "display dialog \"test\" with icon 1"
+            "display dialog \"test\n(via scptdisplay)\" with title \"scptdisplay\" with icon 1"
         );
         assert_eq!(
             String::from(make_cmd(Some("app.icns".to_string())).cmd()),
-            "display dialog \"test\" with icon \"app.icns\""
+            "display dialog \"test\n(via scptdisplay)\" with title \"scptdisplay\" with icon \"app.icns\""
         );
     }
 
@@ -689,7 +744,10 @@ mod tests {
         let c = cli.cmd();
         assert_eq!(String::from(c), "osascript -s s");
         let s = cli.script();
-        assert_eq!(String::from(s), "display notification \"hi\"");
+        assert_eq!(
+            String::from(s),
+            "display notification \"hi\" subtitle \"via scptdisplay\""
+        );
     }
 
     #[test]
@@ -987,5 +1045,163 @@ mod tests {
         };
         assert!(cmd.validate().is_err());
         assert!(cmd.execute_response("true").is_err());
+    }
+
+    #[test]
+    fn test_notification_origin_variations() {
+        // Subtitle already contains scptdisplay
+        let cmd = Commands::Notification {
+            text: Some("hello".to_string()),
+            title: Some("Title".to_string()),
+            subtitle: Some("scptdisplay notification".to_string()),
+            sound_name: None,
+        };
+        assert_eq!(
+            String::from(cmd.cmd()),
+            "display notification \"hello\" with title \"Title\" subtitle \"scptdisplay notification\""
+        );
+
+        // Subtitle is None -> subtitle becomes via scptdisplay
+        let cmd = Commands::Notification {
+            text: Some("hello".to_string()),
+            title: Some("Title".to_string()),
+            subtitle: None,
+            sound_name: None,
+        };
+        assert_eq!(
+            String::from(cmd.cmd()),
+            "display notification \"hello\" with title \"Title\" subtitle \"via scptdisplay\""
+        );
+
+        // Subtitle is Some without scptdisplay -> body gets (via scptdisplay)
+        let cmd = Commands::Notification {
+            text: Some("hello".to_string()),
+            title: None,
+            subtitle: Some("custom sub".to_string()),
+            sound_name: None,
+        };
+        assert_eq!(
+            String::from(cmd.cmd()),
+            "display notification \"hello\n(via scptdisplay)\" subtitle \"custom sub\""
+        );
+    }
+
+    #[test]
+    fn test_alert_origin_variations() {
+        // message is None -> message becomes (via scptdisplay)
+        let cmd = Commands::Alert {
+            text: "alert".to_string(),
+            message: None,
+            alert_type: AlertType::Informational,
+            buttons: vec![],
+            default_button: None,
+            cancel_button: None,
+            giving_up_after: None,
+        };
+        assert_eq!(
+            String::from(cmd.cmd()),
+            "display alert \"alert\" message \"(via scptdisplay)\" as informational"
+        );
+
+        // message already contains (via scptdisplay) -> not duplicated
+        let cmd = Commands::Alert {
+            text: "alert".to_string(),
+            message: Some("existing message\n(via scptdisplay)".to_string()),
+            alert_type: AlertType::Informational,
+            buttons: vec![],
+            default_button: None,
+            cancel_button: None,
+            giving_up_after: None,
+        };
+        assert_eq!(
+            String::from(cmd.cmd()),
+            "display alert \"alert\" message \"existing message\n(via scptdisplay)\" as informational"
+        );
+
+        // message with trailing newline is trimmed
+        let cmd = Commands::Alert {
+            text: "alert".to_string(),
+            message: Some("message with newline\n".to_string()),
+            alert_type: AlertType::Informational,
+            buttons: vec![],
+            default_button: None,
+            cancel_button: None,
+            giving_up_after: None,
+        };
+        assert_eq!(
+            String::from(cmd.cmd()),
+            "display alert \"alert\" message \"message with newline\n(via scptdisplay)\" as informational"
+        );
+    }
+
+    #[test]
+    fn test_dialog_origin_variations() {
+        // title is None -> title becomes scptdisplay
+        let cmd = Commands::Dialog {
+            text: "dialog text".to_string(),
+            default_answer: None,
+            hidden_answer: false,
+            buttons: vec![],
+            default_button: None,
+            cancel_button: None,
+            title: None,
+            icon: None,
+            giving_up_after: None,
+        };
+        assert_eq!(
+            String::from(cmd.cmd()),
+            "display dialog \"dialog text\n(via scptdisplay)\" with title \"scptdisplay\""
+        );
+
+        // title is empty string -> title falls back to scptdisplay
+        let cmd = Commands::Dialog {
+            text: "dialog text".to_string(),
+            default_answer: None,
+            hidden_answer: false,
+            buttons: vec![],
+            default_button: None,
+            cancel_button: None,
+            title: Some("".to_string()),
+            icon: None,
+            giving_up_after: None,
+        };
+        assert_eq!(
+            String::from(cmd.cmd()),
+            "display dialog \"dialog text\n(via scptdisplay)\" with title \"scptdisplay\""
+        );
+
+        // text with trailing newline is trimmed
+        let cmd = Commands::Dialog {
+            text: "dialog text\n".to_string(),
+            default_answer: None,
+            hidden_answer: false,
+            buttons: vec![],
+            default_button: None,
+            cancel_button: None,
+            title: None,
+            icon: None,
+            giving_up_after: None,
+        };
+        assert_eq!(
+            String::from(cmd.cmd()),
+            "display dialog \"dialog text\n(via scptdisplay)\" with title \"scptdisplay\""
+        );
+
+        // text already contains (via scptdisplay) -> not duplicated
+        let cmd = Commands::Dialog {
+            text: "dialog text\n(via scptdisplay)".to_string(),
+            default_answer: None,
+            hidden_answer: false,
+            buttons: vec![],
+            default_button: None,
+            cancel_button: None,
+            title: Some("Custom Title".to_string()),
+            icon: None,
+            giving_up_after: None,
+        };
+        assert_eq!(
+            String::from(cmd.cmd()),
+            "display dialog \"dialog text\n(via scptdisplay)\" with title \"Custom Title\""
+        );
     }
 }

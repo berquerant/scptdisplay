@@ -158,6 +158,16 @@ The command outputs a JSON object to `stdout`:
 
 ---
 
+# Security & Origin Attribution
+
+To prevent notification spoofing, phishing, and deceptive UI prompts masquerading as system dialogs, `scptdisplay` automatically and non-optionally identifies itself as the message origin across all subcommands and MCP tools:
+
+- **Notification**: Defaults the `subtitle` to `"via scptdisplay"` (or appends `(via scptdisplay)` to body `text` if a custom subtitle without `scptdisplay` is specified).
+- **Alert**: Automatically appends `(via scptdisplay)` to the explanatory `message` beneath the alert headline.
+- **Dialog**: Automatically appends `\n(via scptdisplay)` to the prompt `text` and defaults the window title to `"scptdisplay"` when no title is provided.
+
+---
+
 # Requirements & Permissions
 
 - macOS with `osascript` installed.
