@@ -1,5 +1,7 @@
 name: CI
 
+permissions: {}
+
 on:
   push:
     branches:
@@ -8,28 +10,21 @@ on:
     branches:
       - main
 
-permissions: {}
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  build:
-    name: Run
-    runs-on: ubuntu-latest
+  actions-lock-verify:
     permissions:
-      contents: read
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-      - run: |
-          set -e
-          rustup set profile minimal
-          rustup install stable
-          rustup component add clippy rustfmt
-      - uses: Swatinem/rust-cache@v2.9.3
-      - name: lint
-        run: make lint
-      - name: test
-        run: make test
-      - name: build
-        run: make build
+      contents: read # checkout repository to verify actions.lock
+    uses: berquerant/reusable-workflows/.github/workflows/actions-lock-verify.yml@v0.7.1
+
+  ci:
+    permissions:
+      contents: read # checkout repository for Rust CI
+    uses: berquerant/reusable-workflows/.github/workflows/rust-ci.yml@v0.7.1
+    with:
+      lint-command: make lint
+      test-command: make test
+      build-command: make build
